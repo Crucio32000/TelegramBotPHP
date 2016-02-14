@@ -13,7 +13,7 @@ include 'getFile.php';
 class TelegramBot
 {
 	private $API_URL = 'https://api.telegram.org/bot';
-	private $TOKEN = '160002393:AAFFfYr5EBclOio0oNk4sBOxxY4vlMydm1o';
+	private $TOKEN = 'YOUR_TOKEN_HERE';
 	
 	
 	protected $raw_data; //Json Data
