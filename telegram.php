@@ -7,6 +7,9 @@ Attributes:
 	
 	method -> Depends on the response processed in processText() method (sendMessage for example)
 	action -> related to method. Depends on the response processed. (typing, find_location etc)
+	
+	isInlineQuery -> boolean value, indicating if current request is an Inline type or Regular.
+	inlineQuery -> contains all the field inside inline_query , coming from Telegram Servers
 */
 include 'getFile.php';
 
@@ -18,6 +21,8 @@ class TelegramBot
 	
 	protected $raw_data; //Json Data
 	protected $decoded_data; //Json-Decoded Data
+	protected $isInlineQuery = false;	//Initialized to false. Used for checking if incoming query requires inline processing
+	protected $inlineQuery;
 	
 	protected $method;
 	protected $action;
@@ -42,6 +47,7 @@ class TelegramBot
 		//Set attributes and Default actions
 		$this->method = "sendMessage";
 		$this->action = "typing";
+		//Get data
 		if (isset($this->decoded_data["message"]["text"]))
 		{	//Get data and type (photo , text or other)
 			$this->text = $this->decoded_data["message"]["text"];
@@ -57,6 +63,12 @@ class TelegramBot
 			$this->type = "video";
 		}else{
 			$this->type = "unknown";
+		}
+		//Inline query or regular query ?
+		if (isset($this->decoded_data["inline_query"])) 
+		{	//inline_query is present instead of message field in case of an inline request
+			$this->isInlineQuery = isset($this->decoded_data["inline_query"]) ? true : false;
+			$this->inlineQuery = $this->decoded_data["inline_query"];	//Contains id,from,query and offset
 		}
 	}
 	
@@ -86,13 +98,15 @@ class TelegramBot
 	// SETTERS
 	//
 	public function setAction($action)
-	{	//Custom bot that inherits this class, must set the kind of action to perform
+	{	//Custom bot that inherits this class, must set the kind of action to perform.
 		$this->action = $action;
 		return True;
 	}
 	
 	public function setMethod($method)
 	{
+		//sendMessage is the default.
+		//Inline bots adds answerInlineQuery.
 		$this->method = $method;
 		return True;
 	}
@@ -110,6 +124,22 @@ class TelegramBot
 	{
 		return $this->action;
 	}
+	
+	public function getWebhookCall()
+	{
+		return $this->raw_data;
+	}
+	
+	public function getInline()
+	{	//Returns a boolean value, indicating if incoming query is Inline or not.
+		return $this->isInlineQuery;	
+	}
+	
+	
+	//
+	// METHODS
+	//
+	
 	
 	public function getReq($reqArray)
 	{	//Retrieve data for processing the response
@@ -130,21 +160,22 @@ class TelegramBot
 				case 'text':
 					$response['text'] = $this->decoded_data['message']['text'];
 				break;
+					
+				//Inline Bots
+				//Results field is required too. It takes an array of InlineQueryResult. Check official API documentation
+				//Last response for InlineQuery has: inline_query_id, cache_time, results.
+				case 'inline_query_id':
+					$response['inline_query_id'] = $this->inlineQuery['id'];
+				break;
+				
+				case 'cache_time':	//Usually must be set by the custom bot
+					$response['cache_time'] = 86400;	//Default value set here
+				break;
 			}
-			//$response[$key] = $this->decoded_data['message'][$key] or $this->decoded_data['message']['chat'][$key];
 		}
 		return $response;
 	}
 	
-	
-	public function getWebhookCall()
-	{
-		return $this->raw_data;
-	}
-	
-	//
-	// METHODS
-	//
 	
 	//SendChatAction(curl_handler, "action")
 	public function sendChatAction($ch, $chat_id)
@@ -171,7 +202,7 @@ class TelegramBot
 	
 	//Create reply_markup object
 	public function getKeyboard($row)
-	{	
+	{	//Creates a keyboard.
 		$keyboard = array(
 			'keyboard' => array(
 				$row
@@ -186,6 +217,16 @@ class TelegramBot
 	{	//Usage \u2b50 for istance , uniToEmoji(0x2B50)
 		return iconv('UCS-4LE', 'UTF-8', pack('V', $unichr);
 	}
+					 
+	public function getInlineQueryResult($type,$id,$title,$text)
+	{	//"results" field is a regular array of those elements
+		$element = array("type" => $type,
+						"id" => $id,
+						"title" => $title,
+						"message_text" => $text);
+		return $element;
+	}
+					 
 
 }
 
